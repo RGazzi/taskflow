@@ -14,6 +14,7 @@ spring:
   mvc:
     locale: en_US
     locale-resolver: fixed
+  
 jwt:
-   secret: "O21zhID3aNOimTj4tL0lY006e7ppD3K0MiwYOhPbN7y7YUtZ1k5LDytv8iOJTyBv"
-   expiration-ms: 86400000  # 24 horas
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}

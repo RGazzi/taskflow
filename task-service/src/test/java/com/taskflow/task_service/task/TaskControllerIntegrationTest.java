@@ -16,13 +16,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import io.restassured.RestAssured;
 
 @Testcontainers
-@SpringBootTest(
-    webEnvironment = WebEnvironment.RANDOM_PORT,
-    properties = {
-        // Desativa a segurança para resolver o erro 401
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration,org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration"
-    }
-)
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 class TaskControllerIntegrationTest {
 
     @Container
@@ -32,23 +26,37 @@ class TaskControllerIntegrationTest {
     @LocalServerPort
     private int port;
 
+    private String authToken;
+
     @BeforeEach
     void setUp() {
         RestAssured.port = port;
+        authToken = registerAndGetToken();
+    }
+
+    private String registerAndGetToken() {
+        String uniqueEmail = "test-" + System.nanoTime() + "@taskflow.com";
+        return given()
+            .contentType("application/json")
+            .body("""
+                {"email":"%s","password":"senha12345"}
+                """.formatted(uniqueEmail))
+        .when()
+            .post("/auth/register")
+        .then()
+            .statusCode(200)
+            .extract()
+            .path("token");
     }
 
     @Test
     void shouldCreateAndRetrieveTask() {
-        // JSON corrigido com aspas escapadas (\")
-        String jsonBody = "{"
-                + "\"title\": \"Integration test task\","
-                + "\"description\": \"desc\","
-                + "\"dueDate\": \"2026-12-01\""
-                + "}";
-
         given()
+            .header("Authorization", "Bearer " + authToken)
             .contentType("application/json")
-            .body(jsonBody)
+            .body("""
+                {"title":"Integration test task","description":"desc","dueDate":"2026-12-01"}
+                """)
         .when()
             .post("/api/tasks")
         .then()
@@ -60,9 +68,19 @@ class TaskControllerIntegrationTest {
     @Test
     void shouldReturn404WhenTaskDoesNotExist() {
         given()
+            .header("Authorization", "Bearer " + authToken)
         .when()
             .get("/api/tasks/999")
         .then()
             .statusCode(404);
+    }
+
+    @Test
+    void shouldReturn403WhenNoTokenProvided() {
+        given()
+        .when()
+            .get("/api/tasks")
+        .then()
+            .statusCode(403);
     }
 }
